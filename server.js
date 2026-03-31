@@ -85,13 +85,24 @@ function normalizeAnthropicError(error) {
   };
 }
 
+app.get("/", (req, res) => {
+  if (req.accepts("html")) {
+    return res.redirect("/index.html");
+  }
+
+  return res.json({
+    status: "ok",
+    message: "Chatbot backend is running.",
+  });
+});
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
 app.get("/chat", (req, res) => {
   if (req.accepts("html")) {
-    return res.redirect("/");
+    return res.redirect("/index.html");
   }
 
   return res.status(405).json({
