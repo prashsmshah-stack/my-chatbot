@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Chatbot</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5efe4;
+        --panel: rgba(255, 251, 245, 0.9);
+        --ink: #1f1b18;
+        --muted: #6f655d;
+        --accent: #c96f3b;
+        --accent-strong: #9e4d20;
+        --line: rgba(31, 27, 24, 0.12);
+        --user: #2d6a4f;
+        --assistant: #f3dfc7;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Georgia, "Times New Roman", serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(201, 111, 59, 0.22), transparent 32%),
+          radial-gradient(circle at right center, rgba(45, 106, 79, 0.14), transparent 28%),
+          linear-gradient(145deg, #f7f0e7, #efe4d1 55%, #e7d9c2);
+      }
+
+      main {
+        width: min(920px, calc(100% - 32px));
+        margin: 32px auto;
+        padding: 24px;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: var(--panel);
+        box-shadow: 0 20px 60px rgba(55, 37, 21, 0.12);
+        backdrop-filter: blur(12px);
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(2rem, 4vw, 3.2rem);
+        line-height: 1;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .status {
+        margin-top: 14px;
+        font-size: 0.95rem;
+      }
+
+      .chat {
+        margin-top: 24px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.62);
+      }
+
+      .messages {
+        min-height: 380px;
+        max-height: 55vh;
+        padding: 20px;
+        overflow-y: auto;
+        display: grid;
+        gap: 14px;
+      }
+
+      .message {
+        max-width: 80%;
+        padding: 14px 16px;
+        border-radius: 18px;
+        white-space: pre-wrap;
+        line-height: 1.45;
+        animation: rise 180ms ease-out;
+      }
+
+      .message.user {
+        justify-self: end;
+        background: var(--user);
+        color: #f8f6f1;
+        border-bottom-right-radius: 6px;
+      }
+
+      .message.assistant {
+        justify-self: start;
+        background: var(--assistant);
+        color: var(--ink);
+        border-bottom-left-radius: 6px;
+      }
+
+      .message.error {
+        justify-self: start;
+        background: #f5d7cb;
+        color: #5f2410;
+        border: 1px solid rgba(95, 36, 16, 0.12);
+        border-bottom-left-radius: 6px;
+      }
+
+      form {
+        display: grid;
+        gap: 12px;
+        padding: 16px;
+        border-top: 1px solid var(--line);
+        background: rgba(255, 248, 240, 0.78);
+      }
+
+      label {
+        font-size: 0.92rem;
+        color: var(--muted);
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 120px;
+        resize: vertical;
+        padding: 14px 16px;
+        font: inherit;
+        color: var(--ink);
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid rgba(31, 27, 24, 0.16);
+        border-radius: 16px;
+        outline: none;
+      }
+
+      textarea:focus {
+        border-color: rgba(201, 111, 59, 0.65);
+        box-shadow: 0 0 0 4px rgba(201, 111, 59, 0.14);
+      }
+
+      .actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 18px;
+        font: inherit;
+        color: #fff9f2;
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        cursor: pointer;
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.72;
+      }
+
+      .hint {
+        font-size: 0.92rem;
+        color: var(--muted);
+      }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 640px) {
+        main {
+          width: calc(100% - 20px);
+          margin: 10px auto;
+          padding: 18px;
+          border-radius: 20px;
+        }
+
+        .messages {
+          min-height: 300px;
+          max-height: 50vh;
+          padding: 16px;
+        }
+
+        .message {
+          max-width: 92%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>My Chatbot</h1>
+      <p>Type a message below to test your Anthropic-powered backend.</p>
+      <p class="status" id="status">Ready. The page will send a POST request to <code>/chat</code>.</p>
+
+      <section class="chat" aria-label="Chat interface">
+        <div class="messages" id="messages">
+          <div class="message assistant">
+            The backend is up. Ask me something to test the connection.
+          </div>
+        </div>
+
+        <form id="chat-form">
+          <label for="prompt">Message</label>
+          <textarea
+            id="prompt"
+            name="prompt"
+            placeholder="Ask anything..."
+            required
+          ></textarea>
+
+          <div class="actions">
+            <span class="hint">Open <code>/health</code> if you want a quick server check.</span>
+            <button type="submit" id="send-button">Send</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <script>
+      const form = document.getElementById("chat-form");
+      const promptInput = document.getElementById("prompt");
+      const messagesEl = document.getElementById("messages");
+      const statusEl = document.getElementById("status");
+      const sendButton = document.getElementById("send-button");
+
+      const conversation = [
+        {
+          role: "assistant",
+          content: "The backend is up. Ask me something to test the connection.",
+        },
+      ];
+
+      function addMessage(role, content) {
+        const item = document.createElement("div");
+        item.className = `message ${role}`;
+        item.textContent = content;
+        messagesEl.appendChild(item);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const prompt = promptInput.value.trim();
+        if (!prompt) {
+          return;
+        }
+
+        conversation.push({ role: "user", content: prompt });
+        addMessage("user", prompt);
+        promptInput.value = "";
+        statusEl.textContent = "Waiting for Claude...";
+        sendButton.disabled = true;
+
+        try {
+          const response = await fetch("/chat", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ messages: conversation }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            const pieces = [data.error || "Request failed."];
+
+            if (data.hint) {
+              pieces.push(data.hint);
+            }
+
+            const error = new Error(pieces.join("\n\n"));
+            error.code = data.code;
+            throw error;
+          }
+
+          conversation.push({ role: "assistant", content: data.reply });
+          addMessage("assistant", data.reply);
+          statusEl.textContent = "Response received.";
+        } catch (error) {
+          const message = error.message || "Something went wrong.";
+          addMessage("error", message);
+          statusEl.textContent =
+            error.code === "anthropic_insufficient_credits"
+              ? "Anthropic rejected the request because this account needs billing or credits."
+              : "The request failed. Check your API key and server logs.";
+        } finally {
+          sendButton.disabled = false;
+          promptInput.focus();
+        }
+      });
+    </script>
+  </body>
+</html>
