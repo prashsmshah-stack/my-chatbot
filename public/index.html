@@ -3,78 +3,94 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Website</title>
-    <link rel="stylesheet" href="/site.css" />
+    <title>Chatbot Integration Demo</title>
     <link rel="stylesheet" href="/chat-widget.css" />
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        font-family: Arial, sans-serif;
+        background: #f6f2eb;
+        color: #1f2430;
+      }
+
+      .demo-card {
+        width: min(680px, 100%);
+        padding: 28px;
+        border: 1px solid rgba(31, 36, 48, 0.12);
+        border-radius: 20px;
+        background: #fffdf9;
+        box-shadow: 0 18px 42px rgba(31, 36, 48, 0.08);
+      }
+
+      h1 {
+        margin: 0 0 12px;
+      }
+
+      p {
+        margin: 0 0 14px;
+        line-height: 1.6;
+        color: #5f6778;
+      }
+
+      .demo-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 18px;
+      }
+
+      .demo-link,
+      .demo-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 16px;
+        border-radius: 999px;
+        font: inherit;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .demo-link {
+        color: #fff;
+        background: #d95d39;
+      }
+
+      .demo-button {
+        border: 1px solid rgba(31, 36, 48, 0.12);
+        background: #fff;
+        color: #1f2430;
+      }
+
+      code {
+        padding: 2px 6px;
+        border-radius: 6px;
+        background: #f2ece4;
+      }
+    </style>
   </head>
   <body>
-    <header class="site-header">
-      <div class="brand">My Website</div>
-      <nav class="site-nav">
-        <a href="#about">About</a>
-        <a href="#services">Services</a>
-        <a href="#contact">Contact</a>
-      </nav>
-    </header>
-
-    <main>
-      <section class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">Smart support for your visitors</p>
-          <h1>Welcome to your website.</h1>
-          <p class="hero-text">
-            This is now a real website page with the chatbot built into it as a floating assistant,
-            instead of a full-screen chat page.
-          </p>
-          <div class="hero-actions">
-            <a class="button primary" href="#services">Explore</a>
-            <button class="button secondary" id="open-chat" type="button">Ask the assistant</button>
-          </div>
-        </div>
-        <div class="hero-card">
-          <h2>Website assistant</h2>
-          <p>
-            Your users can browse the website normally and open the chatbot whenever they need help.
-          </p>
-        </div>
-      </section>
-
-      <section class="content-grid" id="about">
-        <article class="content-card">
-          <h2>About</h2>
-          <p>
-            Add your real company, portfolio, or product content here. The chatbot will keep working
-            on top of the page.
-          </p>
-        </article>
-
-        <article class="content-card" id="services">
-          <h2>Services</h2>
-          <p>
-            You can describe your services, FAQs, pricing, or support information while the chat widget
-            stays available in the corner.
-          </p>
-        </article>
-
-        <article class="content-card" id="contact">
-          <h2>Contact</h2>
-          <p>
-            Add your email, phone number, social links, or contact form here.
-          </p>
-        </article>
-      </section>
+    <main class="demo-card">
+      <h1>Chatbot Widget Demo</h1>
+      <p>
+        This page is only a minimal demo. You can replace it with your own website and keep using
+        the chatbot widget files.
+      </p>
+      <p>
+        To open the chatbot from your own website, add
+        <code>data-chatbot-open</code> to any link or button.
+      </p>
+      <div class="demo-actions">
+        <a class="demo-link" href="#chatbot" data-chatbot-open>Open Chatbot From Link</a>
+        <button class="demo-button" type="button" data-chatbot-open>Open Chatbot From Button</button>
+      </div>
     </main>
 
-    <div id="chat-widget-root"></div>
-
     <script src="/chat-widget.js"></script>
-    <script>
-      const openChatButton = document.getElementById("open-chat");
-      if (openChatButton) {
-        openChatButton.addEventListener("click", () => {
-          window.ChatWidget?.open();
-        });
-      }
-    </script>
   </body>
 </html>
