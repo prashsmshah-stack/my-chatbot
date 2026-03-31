@@ -18,10 +18,29 @@ if (fs.existsSync(defaultEnvPath)) {
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
+const widgetShellHtml = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chatbot Widget</title>
+    <link rel="stylesheet" href="/chat-widget.css" />
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #f6f2eb;
+      }
+    </style>
+  </head>
+  <body>
+    <script src="/chat-widget.js" defer></script>
+  </body>
+</html>`;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.static("public", { index: false }));
 
 const client = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -87,7 +106,7 @@ function normalizeAnthropicError(error) {
 
 app.get("/", (req, res) => {
   if (req.accepts("html")) {
-    return res.redirect("/index.html");
+    return res.type("html").send(widgetShellHtml);
   }
 
   return res.json({
@@ -102,7 +121,7 @@ app.get("/health", (_req, res) => {
 
 app.get("/chat", (req, res) => {
   if (req.accepts("html")) {
-    return res.redirect("/index.html");
+    return res.redirect("/#chatbot");
   }
 
   return res.status(405).json({
