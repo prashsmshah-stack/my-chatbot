@@ -119,6 +119,32 @@
   border-bottom-left-radius: 6px;
 }
 
+.chat-reference-list {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(31, 36, 48, 0.12);
+  display: grid;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: #5c6575;
+}
+
+.chat-reference-item {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.chat-reference-label {
+  font-weight: 700;
+  color: #2d3645;
+}
+
+.chat-reference-question {
+  margin-top: 4px;
+  line-height: 1.45;
+}
+
 .chat-form {
   display: grid;
   gap: 10px;

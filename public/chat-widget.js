@@ -1,8 +1,67 @@
 (function () {
+  const bootstrapScript = document.currentScript;
+
+  function trimTrailingSlash(value) {
+    return String(value || "").replace(/\/+$/, "");
+  }
+
+  function getScriptDirectory(script) {
+    if (!script?.src) {
+      return "";
+    }
+
+    try {
+      const url = new URL(script.src, window.location.href);
+      url.pathname = url.pathname.replace(/\/[^/]*$/, "");
+      return trimTrailingSlash(url.toString());
+    } catch {
+      return "";
+    }
+  }
+
+  function joinUrl(baseUrl, path) {
+    const cleanBase = trimTrailingSlash(baseUrl);
+    const cleanPath = path.startsWith("/") ? path : `/${path}`;
+    return cleanBase ? `${cleanBase}${cleanPath}` : cleanPath;
+  }
+
+  function injectWidgetStylesheet(cssHref) {
+    if (!cssHref) {
+      return;
+    }
+
+    const absoluteHref = new URL(cssHref, window.location.href).toString();
+    const existingLink = Array.from(document.querySelectorAll("link[rel='stylesheet']")).find(
+      (link) => link.href === absoluteHref
+    );
+
+    if (existingLink) {
+      return;
+    }
+
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = absoluteHref;
+    document.head.appendChild(link);
+  }
+
   function initChatWidget() {
     if (window.ChatWidget) {
       return;
     }
+
+    const config = window.ChatWidgetConfig || {};
+    const assetBase =
+      trimTrailingSlash(config.assetBase) || getScriptDirectory(bootstrapScript) || "";
+    const apiBase =
+      trimTrailingSlash(config.apiBase) ||
+      trimTrailingSlash(bootstrapScript?.dataset?.apiBase) ||
+      "";
+    const cssHref =
+      config.cssHref || bootstrapScript?.dataset?.cssHref || joinUrl(assetBase, "/chat-widget.css");
+    const chatEndpoint = joinUrl(apiBase, "/chat");
+
+    injectWidgetStylesheet(cssHref);
 
     const existingRoot = document.getElementById("chat-widget-root");
     const root = existingRoot || document.createElement("div");
@@ -33,7 +92,7 @@
 
           <form class="chat-form" id="chat-form">
             <div class="chat-status" id="chat-status">
-              Ready. Messages will be sent to the backend at <code>/chat</code>.
+              Ready. Messages will be sent to the chatbot backend.
             </div>
 
             <textarea
@@ -90,6 +149,36 @@
       message.textContent = content;
       messagesEl.appendChild(message);
       messagesEl.scrollTop = messagesEl.scrollHeight;
+      return message;
+    }
+
+    function appendReferences(messageElement, references) {
+      if (!messageElement || !Array.isArray(references) || references.length === 0) {
+        return;
+      }
+
+      const referenceList = document.createElement("div");
+      referenceList.className = "chat-reference-list";
+
+      references.slice(0, 3).forEach((reference, index) => {
+        const item = document.createElement("div");
+        item.className = "chat-reference-item";
+
+        const label = document.createElement("div");
+        label.className = "chat-reference-label";
+        label.textContent = `Reference ${index + 1}: ${reference.label || "Training data"}`;
+
+        const question = document.createElement("div");
+        question.className = "chat-reference-question";
+        question.textContent = `Q: ${reference.question}`;
+
+        item.appendChild(label);
+        item.appendChild(question);
+        referenceList.appendChild(item);
+      });
+
+      messageElement.appendChild(referenceList);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
     launcher.addEventListener("click", open);
@@ -125,7 +214,7 @@
       sendButton.disabled = true;
 
       try {
-        const response = await fetch("/chat", {
+        const response = await fetch(chatEndpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -147,8 +236,12 @@
         }
 
         conversation.push({ role: "assistant", content: data.reply });
-        addMessage("assistant", data.reply);
-        status.textContent = "Response received.";
+        const assistantMessage = addMessage("assistant", data.reply);
+        appendReferences(assistantMessage, data.references);
+        status.textContent =
+          data.source === "knowledge-base-fallback"
+            ? "Response received from the uploaded DJP training data."
+            : "Response received.";
       } catch (error) {
         addMessage("error", error.message || "Something went wrong.");
         status.textContent =
@@ -161,7 +254,7 @@
       }
     });
 
-    window.ChatWidget = { open, close };
+    window.ChatWidget = { open, close, endpoint: chatEndpoint };
 
     if (window.location.hash === "#chatbot") {
       open();

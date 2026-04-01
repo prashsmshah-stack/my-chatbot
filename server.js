@@ -4,6 +4,12 @@ const dotenv = require("dotenv");
 const express = require("express");
 const cors = require("cors");
 const Anthropic = require("@anthropic-ai/sdk");
+const {
+  buildKnowledgeContext,
+  buildReferencePayload,
+  loadKnowledgeBase,
+  retrieveKnowledgeEntries,
+} = require("./knowledge-base");
 
 const defaultEnvPath = path.join(process.cwd(), ".env");
 const fallbackEnvPath = path.join(process.cwd(), ".env.txt");
@@ -18,6 +24,7 @@ if (fs.existsSync(defaultEnvPath)) {
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
+const knowledgeBase = loadKnowledgeBase();
 const widgetShellHtml = `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -45,6 +52,78 @@ app.use(express.static("public", { index: false }));
 const client = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   : null;
+
+function getMessageText(content) {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+
+        if (item?.type === "text") {
+          return item.text || "";
+        }
+
+        return "";
+      })
+      .join("\n")
+      .trim();
+  }
+
+  return "";
+}
+
+function getLatestUserQuestion(messages) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === "user") {
+      const text = getMessageText(messages[index].content);
+
+      if (text) {
+        return text;
+      }
+    }
+  }
+
+  return "";
+}
+
+function getConversationForModel(messages) {
+  return messages
+    .slice(-8)
+    .map((message) => ({
+      role: message.role,
+      content: getMessageText(message.content),
+    }))
+    .filter((message) => message.content);
+}
+
+function buildKnowledgeOnlyReply(matches) {
+  if (!matches.length) {
+    return "I could not find an answer for that in the uploaded DJP Level 1 training data.";
+  }
+
+  const bestMatch = matches[0];
+  const nextMatches = matches.slice(1, 3);
+
+  if (
+    bestMatch.score >= 85 ||
+    !nextMatches.length ||
+    bestMatch.score >= (nextMatches[0]?.score || 1) * 1.6
+  ) {
+    return bestMatch.answer;
+  }
+
+  const combinedAnswers = [bestMatch, ...nextMatches]
+    .map((entry, index) => `Point ${index + 1}: ${entry.answer}`)
+    .join("\n\n");
+
+  return `I found multiple relevant points in the DJP Level 1 material:\n\n${combinedAnswers}`;
+}
 
 function extractAnthropicMessage(error) {
   const directMessage =
@@ -116,7 +195,11 @@ app.get("/", (req, res) => {
 });
 
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok" });
+  res.json({
+    status: "ok",
+    knowledgeLoaded: knowledgeBase.loaded,
+    knowledgeEntries: knowledgeBase.entries.length,
+  });
 });
 
 app.get("/chat", (req, res) => {
@@ -129,6 +212,15 @@ app.get("/chat", (req, res) => {
   });
 });
 
+app.get("/knowledge-status", (_req, res) => {
+  res.json({
+    loaded: knowledgeBase.loaded,
+    entries: knowledgeBase.entries.length,
+    filePath: knowledgeBase.filePath,
+    error: knowledgeBase.error,
+  });
+});
+
 app.post("/chat", async (req, res) => {
   const { messages } = req.body ?? {};
 
@@ -138,33 +230,74 @@ app.post("/chat", async (req, res) => {
     });
   }
 
+  const latestQuestion = getLatestUserQuestion(messages);
+
+  if (!latestQuestion) {
+    return res.status(400).json({
+      error: "Could not find a user question in the messages array.",
+    });
+  }
+
+  const knowledgeMatches = retrieveKnowledgeEntries(knowledgeBase, latestQuestion, 5);
+  const references = buildReferencePayload(knowledgeMatches);
+
+  if (!knowledgeMatches.length) {
+    return res.json({
+      reply:
+        "I could not find an answer for that in the uploaded DJP Level 1 training data.",
+      references: [],
+      source: "knowledge-base",
+    });
+  }
+
   if (!client) {
-    return res.status(500).json({
-      error: "Missing ANTHROPIC_API_KEY. Add it to .env or .env.txt.",
+    return res.json({
+      reply: buildKnowledgeOnlyReply(knowledgeMatches),
+      references,
+      source: "knowledge-base-fallback",
     });
   }
 
   try {
+    const knowledgeContext = buildKnowledgeContext(knowledgeMatches);
     const response = await client.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1024,
-      system: "You are a helpful assistant for my website.",
-      messages,
+      system: `You are a textbook-grounded assistant for Digital Jain Pathshala Level 1.
+Answer only from the provided knowledge context.
+If the answer is not supported by the context, clearly say you do not know based on the uploaded training data.
+Do not invent facts.
+Keep the answer clear and concise for website visitors.`,
+      messages: [
+        ...getConversationForModel(messages),
+        {
+          role: "user",
+          content: `Knowledge context:\n${knowledgeContext}\n\nCurrent user question:\n${latestQuestion}`,
+        },
+      ],
     });
 
     const reply =
       response.content.find((item) => item.type === "text")?.text ??
       "No text response returned.";
 
-    return res.json({ reply });
+    return res.json({
+      reply,
+      references,
+      source: "anthropic-grounded",
+    });
   } catch (error) {
     const normalizedError = normalizeAnthropicError(error);
 
-    return res.status(normalizedError.statusCode).json({
-      error: normalizedError.error,
-      hint: normalizedError.hint,
-      code: normalizedError.code,
-      providerMessage: normalizedError.providerMessage,
+    return res.json({
+      reply: buildKnowledgeOnlyReply(knowledgeMatches),
+      references,
+      source: "knowledge-base-fallback",
+      warning: {
+        error: normalizedError.error,
+        hint: normalizedError.hint,
+        code: normalizedError.code,
+      },
     });
   }
 });
